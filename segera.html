@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segera hadir – ADM Guru Pembelajaran</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+<script src="assets/firebase-config.js"></script>
+<script src="assets/sidebar.js"></script>
+</head>
+<body>
+<script>
+/* Halaman sementara untuk menu yang belum dibuat. Hilang otomatis setelah path halaman masuk daftar BUILT di sidebar.js. */
+const q = new URLSearchParams(location.search), m = q.get('m') || '', s = q.get('s') || '';
+const v = ADM.mount({menu:m, sub:s, title:s || 'Segera hadir'});
+const subs = ((ADM.MENU.find(x => x[0] === m) || [0,0,[]])[2]).map(x => x[0]);
+v.innerHTML = `<div class="box soon"><div class="big">🛠</div><h2>${ADM.esc(s)}</h2>
+<p>${ADM.esc(ADM.INFO[s] || '')} Halaman ini sedang disiapkan dan hanya akan menampilkan data ${ADM.esc(ADM.guru.mapel)}.</p>
+<ul>${subs.map(x => `<li>${ADM.esc(x)}</li>`).join('')}</ul></div>`;
+</script>
+</body>
+</html>

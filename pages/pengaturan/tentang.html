@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tentang Aplikasi | ADM Guru</title>
+
+  <style>
+    .tentang-wrap {
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 10px 0 30px;
+    }
+
+    .tentang-card {
+      background: var(--card, #fff);
+      color: var(--text, #243746);
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .tentang-header {
+      text-align: center;
+      padding: 35px 25px;
+      background: var(--side, #123f40);
+      color: #fff;
+    }
+
+    .tentang-logo {
+      width: 105px;
+      height: 105px;
+      object-fit: contain;
+      background: white;
+      padding: 8px;
+      border-radius: 20px;
+      margin-bottom: 18px;
+    }
+
+    .tentang-header h2 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .tentang-header h3 {
+      margin: 8px 0 15px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .tentang-header p {
+      max-width: 570px;
+      margin: auto;
+      color: #d5e6e3;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .tentang-body {
+      padding: 28px;
+    }
+
+    .tentang-section {
+      margin-bottom: 28px;
+    }
+
+    .tentang-section h3 {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin: 0 0 16px;
+      color: var(--primary, #176b63);
+    }
+
+    .tentang-info {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 13px;
+      font-size: 14px;
+    }
+
+    .tentang-info span:first-child {
+      color: var(--muted, #84909c);
+    }
+
+    .tentang-dev {
+      padding: 20px;
+      background: var(--soft, #f3f7f6);
+      border-radius: 12px;
+    }
+
+    .tentang-dev strong {
+      display: block;
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .tentang-dev p {
+      font-size: 13px;
+      color: var(--muted, #84909c);
+      margin: 5px 0;
+    }
+
+    .tentang-footer {
+      border-top: 1px solid var(--border, #e5e7eb);
+      padding: 18px;
+      text-align: center;
+      color: var(--muted, #84909c);
+      font-size: 12px;
+    }
+
+    @media(max-width: 500px) {
+      .tentang-body {
+        padding: 20px;
+      }
+
+      .tentang-info {
+        grid-template-columns: 100px 1fr;
+      }
+
+      .tentang-header {
+        padding: 28px 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <script>
+    (function () {
+      const S = window.ADM;
+
+      const view = S.mount({
+        menu: 'Pengaturan',
+        sub: 'Tentang Aplikasi',
+        title: 'Tentang Aplikasi',
+        desc: 'Informasi dan identitas aplikasi ADM Guru Pembelajaran'
+      });
+
+      view.innerHTML = `
+
+        <div class="tentang-wrap">
+
+          <div class="tentang-card">
+
+            <div class="tentang-header">
+
+              <img
+                class="tentang-logo"
+                src="${S.base}www/assets/template/logo.jpg"
+                alt="Logo KW"
+                onerror="this.style.display='none'"
+              >
+
+              <h2>ADM GURU</h2>
+
+              <h3>Sistem Administrasi dan Guru</h3>
+
+              <p>
+                Aplikasi digital terintegrasi untuk membantu
+                pengelolaan administrasi sekolah dan kegiatan
+                pembelajaran guru secara efektif dan terorganisasi.
+              </p>
+
+            </div>
+
+            <div class="tentang-body">
+
+              <section class="tentang-section">
+
+                <h3>INFORMASI APLIKASI</h3>
+
+                <div class="tentang-info">
+
+                  <span>Versi</span>
+                  <strong>1.0.0</strong>
+
+                  <span>Platform</span>
+                  <strong>Web Application</strong>
+
+                  <span>Tahun</span>
+                  <strong>2026</strong>
+
+                </div>
+
+              </section>
+
+              <section class="tentang-section">
+
+                <h3>DIKEMBANGKAN OLEH</h3>
+
+                <div class="tentang-dev">
+
+                  <strong>
+                    Komang Winastiyana, S.Pd., Gr., M.Pd.
+                  </strong>
+
+                  <p>SMP Negeri 20 Konawe Selatan</p>
+
+                  <p>+62828821165</p>
+
+                </div>
+
+              </section>
+
+            </div>
+
+            <div class="tentang-footer">
+
+              © 2026 KW. All Rights Reserved.
+
+            </div>
+
+          </div>
+
+        </div>
+
+      `;
+
+    })();
+  </script>
+
+</body>
+</html>
