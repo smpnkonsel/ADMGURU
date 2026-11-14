@@ -40,8 +40,9 @@ const jadwal=v=>crud({coll:'jadwal',multi:['jam','kelas','mapel'],sort:(a,b)=>HA
 /* ─── [J3] MENU: Pengaturan › Kalender Akademik
    Data per agenda: tanggal (mulai), sampai (opsional), jenis, ket.
    Jenis berawalan "Libur" = bukan hari efektif; dibaca Presensi lewat U.liburSet.
-   Tombol "Impor Kalender Konsel 2024/2025" mengisi agenda dari PDF Dinas Pendidikan Konawe Selatan (versi SMP).
-   Untuk tahun ajaran baru: ganti isi KONSEL_2425 (format sama) atau input manual lewat form. ─── */
+   Tombol "Impor dari file PDF" membaca PDF Kalender Pendidikan Dinas (PDF teks, bukan scan) → pratinjau → simpan.
+   Pratinjau juga mencocokkan Hari Belajar Efektif (HBE) per bulan dengan angka yang tertulis di PDF.
+   Tombol "Impor Kalender Konsel 2024/2025" tetap ada (data tertanam KONSEL_2425). ─── */
 const JENIS=['Hari efektif','Libur','Libur semester','Ujian','Kegiatan'],
   rentang=r=>e(r.sampai&&r.sampai!==r.tanggal?`${fmt(r.tanggal)} – ${fmt(r.sampai)}`:fmt(r.tanggal));
 
@@ -92,13 +93,158 @@ function hbePerBulan(rows){const libur=liburSet(rows),hasil={},ts=rows.map(r=>r.
     hasil[k]++}
   return hasil}
 
-const kalenderCrud=crud({coll:'kalender',sort:(a,b)=>(a.tanggal||'').localeCompare(b.tanggal||''),
+/* ═══ Pembaca PDF Kalender Pendidikan (satu objek PDFKAL, tidak menambah nama global lain) ═══
+   baca(file)      → daftar baris teks PDF (pdf.js dimuat dari cdnjs saat pertama dipakai)
+   parse(baris)    → {agenda:[{tanggal,sampai,jenis,ket,cat?}], hbe:{'2024-07':21,…}, y1, y2}
+   banding(rows,y1,y2) → HBE per bulan "gaya PDF Dinas" dari agenda yang dipilih            */
+const PDFKAL=(()=>{
+  const NAMA=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],
+    BLN={jan:1,feb:2,mar:3,apr:4,mei:5,jun:6,jul:7,agu:8,sep:9,okt:10,nov:11,des:12},
+    RX_AGENDA=/(^|[^\d/])(\d{1,2})(?:\s*-\s*(\d{1,2}))?\s+(Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Juni?|Juli?|Agu(?:stus)?|Sep(?:t(?:ember)?)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\.?\s*:/gi,
+    RX_HBE=/HBE\s*=\s*(\d+)\s*\/\s*ME\s*=\s*(\d+)\s*\(SMP\)/gi,
+    p2=n=>String(n).padStart(2,'0'),
+    iso=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`,
+    obj=s=>new Date(s+'T00:00:00'),
+    PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+
+  const jenisDari=k=>
+    /libur semester|PPDB/i.test(k)?'Libur semester':
+    /^(persiapan|gladi)/i.test(k)?'Kegiatan':
+    /pelaksanaan\s+(PTS|STS|PAS|SAS|ANBK|US)/i.test(k)?'Ujian':
+    /libur|hari raya|tahun baru|natal|wafat|maulid|isra|kenaikan|waisak|buruh|pancasila|kemerdekaan|cuti|imlek|hardiknas/i.test(k)?'Libur':'Kegiatan';
+
+  async function baca(file){
+    if(!window.pdfjsLib){
+      await new Promise((ok,gagal)=>{const s=document.createElement('script');s.src=PDFJS+'pdf.min.js';s.onload=ok;
+        s.onerror=()=>gagal(new Error('Gagal memuat pdf.js. Periksa koneksi internet.'));document.head.appendChild(s)});
+      pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
+    let pdf;
+    try{pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise}
+    catch(er){throw new Error('PDF tidak dapat dibuka (rusak atau diproteksi password).')}
+    const baris=[];
+    for(let p=1;p<=pdf.numPages;p++){
+      const tc=await(await pdf.getPage(p)).getTextContent(),rows=[];
+      tc.items.forEach(it=>{if(!it.str.trim())return;
+        const y=it.transform[5],x=it.transform[4];let r=rows.find(r=>Math.abs(r.y-y)<2);
+        if(!r)rows.push(r={y,it:[]});r.it.push({x,s:it.str})});
+      rows.sort((a,b)=>b.y-a.y).forEach(r=>baris.push(r.it.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ').replace(/\s+/g,' ').trim()))}
+    return baris}
+
+  function parse(baris){
+    const th=baris.join('\n').match(/(\d{4})\s*\/\s*(\d{4})/);
+    if(!th)throw new Error('Tahun pelajaran (mis. 2024/2025) tidak ditemukan. PDF mungkin hasil scan/foto atau bukan kalender pendidikan.');
+    const y1=+th[1],y2=+th[2],agenda=[],lihat=new Set(),hb=[];
+    baris.forEach(row=>{
+      for(const m of row.matchAll(RX_HBE))hb.push(+m[1]);
+      const ms=[...row.matchAll(RX_AGENDA)];
+      ms.forEach((m,i)=>{
+        const bln=BLN[m[4].slice(0,3).toLowerCase()],thn=bln>=7?y1:y2,
+          akhir=i+1<ms.length?ms[i+1].index+ms[i+1][1].length:undefined,
+          ket=row.slice(m.index+m[0].length,akhir).replace(/\s*\*\s*SEMESTER\s+(GANJIL|GENAP).*$/i,'').trim();
+        if(/\b(SD|MI|SDLB|PAUD)\b|Paket A/.test(ket)&&!/SMP|MTs|Paket B/.test(ket))return; // agenda khusus SD/MI
+        const tg=n=>`${thn}-${p2(bln)}-${p2(n)}`,a=+m[2],z=m[3]?+m[3]:0,
+          r={tanggal:tg(a),sampai:z>a?tg(z):'',jenis:ket?jenisDari(ket):'Libur semester',ket:ket||'(keterangan di PDF kosong, mohon cek)'},
+          kunci=r.tanggal+'|'+r.ket;
+        if(!lihat.has(kunci)){lihat.add(kunci);agenda.push(r)}})});
+    /* Libur semester yang berakhir di hari yang sama dengan awal agenda lain (mis. PPDB 1–8 Juli & MPLS 8–10 Juli): akhir libur dimajukan 1 hari */
+    agenda.forEach(r=>{
+      if(r.jenis==='Libur semester'&&r.sampai&&agenda.some(x=>x!==r&&!/^Libur/i.test(x.jenis)&&x.tanggal===r.sampai)){
+        const d=obj(r.sampai);d.setDate(d.getDate()-1);
+        r.sampai=iso(d)>r.tanggal?iso(d):'';r.cat='Tanggal akhir dimajukan 1 hari karena bertumpuk dengan agenda berikutnya'}});
+    agenda.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    const hbe={};
+    if(hb.length===12)hb.forEach((n,i)=>{const b=(6+i)%12+1;hbe[`${b>=7?y1:y2}-${p2(b)}`]=n});
+    return{agenda,hbe,y1,y2}}
+
+  /* Cara PDF Dinas menghitung HBE: Senin–Sabtu, di luar Libur*, PAS/SAS, ANBK, US, pengolahan nilai/PORSENI,
+     penyerahan buku laporan, dan Pesantren Ramadhan. MPLS, gladi bersih, dan PTS/STS tetap dihitung efektif. */
+  const efektif=r=>/^Libur/i.test(r.jenis)?false:
+    r.jenis==='Ujian'?/PTS|STS/i.test(r.ket):
+    r.jenis==='Kegiatan'?/awal masuk|MPLS|persiapan|gladi/i.test(r.ket):true;
+
+  function banding(rows,y1,y2){
+    const non=new Set(),hasil={};
+    rows.forEach(r=>{if(!r.tanggal||efektif(r))return;
+      for(let d=obj(r.tanggal),z=obj(r.sampai||r.tanggal);d<=z;d.setDate(d.getDate()+1))non.add(iso(d))});
+    for(let d=new Date(y1,6,1);d<=new Date(y2,5,30);d.setDate(d.getDate()+1)){
+      const k=iso(d).slice(0,7),o=hasil[k]=hasil[k]||{n:0,hari:[]};
+      if(d.getDay()!==0&&!non.has(iso(d))){o.n++;o.hari.push(d.getDate())}}
+    return hasil}
+
+  return{baca,parse,banding,NAMA}})();
+
+/* grup (opsional, didukung crud di [C]): label kelompok tabel. Juli–Des = Semester Ganjil TP th/th+1, Jan–Jun = Semester Genap TP th-1/th */
+const semesterDari=r=>{const th=+(r.tanggal||'').slice(0,4),b=+(r.tanggal||'').slice(5,7);
+  return!th?'Tanpa tanggal':b>=7?`Semester Ganjil ${th}/${th+1}`:`Semester Genap ${th-1}/${th}`};
+const kalenderCrud=crud({coll:'kalender',grup:semesterDari,sort:(a,b)=>(a.tanggal||'').localeCompare(b.tanggal||''),
   f:[date('tanggal','Tanggal mulai'),date('sampai','Sampai tanggal (kosongkan bila 1 hari)'),{k:'jenis',l:'Jenis',t:'select',o:JENIS},{k:'ket',l:'Keterangan'}],
   cols:[['tanggal','Tanggal',rentang],['jenis','Jenis',r=>tag(e(r.jenis),isLibur(r.jenis)?'b':r.jenis==='Ujian'?'w':'n')],['ket','Keterangan']]});
 
 async function kalender(v){
-  v.innerHTML=`<div class="box" style="max-width:760px"><button class="btn2 ghost" id="ki">Impor Kalender Konsel 2024/2025</button> <button class="btn2 ghost" id="kh">Hitung hari efektif</button>
-    <p class="hint">Jenis berawalan <b>Libur</b> dilewati otomatis di Presensi. Impor tidak menimpa data lama; agenda yang sama dilewati. Data diambil dari kalender Dinas Pendidikan Konawe Selatan (versi SMP); periksa kembali bagian yang bertanda “mohon cek”.</p><div id="kr"></div></div><div id="kt"></div>`;
+  v.innerHTML=`<div class="box" style="max-width:760px"><button class="btn2" id="kp">Impor dari file PDF</button>
+    <input type="file" id="kf" accept="application/pdf" style="display:none">
+    <button class="btn2 ghost" id="ki">Impor Kalender Konsel 2024/2025</button> <button class="btn2 ghost" id="kh">Hitung hari efektif</button>
+    <p class="hint">Jenis berawalan <b>Libur</b> dilewati otomatis di Presensi. <b>Impor dari file PDF</b> membaca Kalender Pendidikan Dinas (harus PDF teks, bukan hasil scan/foto), menampilkan pratinjau yang bisa diedit, lalu mencocokkan HBE per bulan dengan angka di PDF. Agenda yang sudah ada tidak ditimpa.</p><div id="kr"></div></div><div id="kt"></div>`;
+
+  const q=s=>$('kr').querySelector(s);
+
+  $('kp').onclick=()=>$('kf').click();
+  $('kf').onchange=async ev=>{
+    const f=ev.target.files[0];ev.target.value='';if(!f)return;
+    try{S.toast('Membaca PDF…');
+      const hasil=PDFKAL.parse(await PDFKAL.baca(f));
+      if(!hasil.agenda.length)return S.toast('Tidak ada agenda terbaca. PDF mungkin hasil scan/foto.',1);
+      const ada=await S.db.list('kalender',{},1);
+      pratinjau(hasil,ada)}
+    catch(er){S.toast(er.message,1)}};
+
+  function pratinjau(hasil,ada){
+    const {agenda:ag,hbe,y1,y2}=hasil,
+      kunciLama=new Set(ada.flatMap(x=>[x.tanggal+'|'+(x.sampai||'')+'|'+x.jenis,x.tanggal+'|'+(x.ket||'')])),
+      sudah=ag.map(r=>kunciLama.has(r.tanggal+'|'+(r.sampai||'')+'|'+r.jenis)||kunciLama.has(r.tanggal+'|'+r.ket));
+    const ganjil=i=>ag[i].tanggal.slice(0,4)===String(y1)&&ag[i].tanggal.slice(5,7)>='07',
+      barisAg=i=>{const r=ag[i];return`<tr><td><input type="checkbox" data-i="${i}"${sudah[i]?'':' checked'}></td><td>${rentang(r)}</td>
+        <td><select data-j="${i}">${JENIS.map(j=>`<option${j===r.jenis?' selected':''}>${e(j)}</option>`).join('')}</select></td>
+        <td><input data-k="${i}" value="${e(r.ket)}" style="width:100%">${sudah[i]?'<div class="hint">Sudah ada di kalender, tidak dicentang.</div>':''}${r.cat?`<div class="hint">${e(r.cat)}</div>`:''}</td></tr>`},
+      tabelAg=(judul,idx)=>`<h4 style="margin:14px 0 4px">${judul} <span class="hint">(${idx.length} agenda)</span></h4>
+        <div style="overflow-x:auto"><table class="tbl"><tbody>${idx.map(barisAg).join('')||'<tr><td class="hint">Tidak ada agenda.</td></tr>'}</tbody></table></div>`,
+      semua=ag.map((_,i)=>i);
+    $('kr').innerHTML=`<p style="margin-top:10px"><b>${ag.length} agenda terbaca</b> dari kalender TP ${y1}/${y2}. Periksa, ubah jenis/keterangan bila perlu, hapus centang yang tidak diperlukan.</p>`
+      +tabelAg(`Semester Ganjil (Juli–Desember ${y1})`,semua.filter(ganjil))
+      +tabelAg(`Semester Genap (Januari–Juni ${y2})`,semua.filter(i=>!ganjil(i)))
+      +`<div id="kb"></div><button class="btn2" id="ks" style="margin-top:8px">Simpan agenda terpilih</button>`;
+
+    const ambil=()=>ag.map((r,i)=>({tanggal:r.tanggal,sampai:r.sampai,jenis:q(`[data-j="${i}"]`).value,ket:q(`[data-k="${i}"]`).value.trim(),pilih:q(`[data-i="${i}"]`).checked}));
+
+    function cocokkan(){
+      const kb=q('#kb');
+      if(Object.keys(hbe).length!==12){kb.innerHTML='<p class="hint" style="margin-top:10px">Angka HBE per bulan tidak ditemukan di PDF, pencocokan dilewati.</p>';return}
+      const rows=ambil().filter(r=>r.pilih),hit=PDFKAL.banding(rows,y1,y2),ks=Object.keys(hbe).sort();
+      let cocok=0;
+      const status=(a,b)=>a===b?'✓ cocok':`⚠ selisih ${b-a>0?'+':''}${b-a}`,
+        bagian=(judul,kunci)=>{let sa=0,sb=0;
+          const tr=kunci.map(k=>{const [th,bl]=k.split('-'),a=hbe[k],b=hit[k]?hit[k].n:0;sa+=a;sb+=b;if(a===b)cocok++;
+            return`<tr><td>${PDFKAL.NAMA[+bl-1]} ${th}</td><td>${a}</td><td>${b}</td><td>${status(a,b)}</td></tr>`+
+              (a===b?'':`<tr><td colspan="4" class="hint">Tanggal yang terhitung efektif: ${hit[k]&&hit[k].hari.length?hit[k].hari.join(', '):'tidak ada'}. Bandingkan dengan kotak putih (tanpa warna) pada bulan ini di PDF, lalu tambah/ubah agenda yang kurang.</td></tr>`)}).join('');
+          return`<h4 style="margin:14px 0 4px">${judul}</h4><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Bulan</th><th>HBE PDF</th><th>Hitungan aplikasi</th><th>Status</th></tr></thead><tbody>${tr}
+            <tr><td><b>Jumlah</b></td><td><b>${sa}</b></td><td><b>${sb}</b></td><td>${status(sa,sb)}</td></tr></tbody></table></div>`},
+        gj=bagian(`HBE Semester Ganjil (Juli–Desember ${y1})`,ks.filter(k=>+k.slice(5)>=7)),
+        gn=bagian(`HBE Semester Genap (Januari–Juni ${y2})`,ks.filter(k=>+k.slice(5)<7));
+      kb.innerHTML=`<p style="margin-top:12px"><b>Pencocokan HBE dengan PDF:</b> ${cocok} dari 12 bulan cocok. Total HBE di PDF: ${ks.reduce((s,k)=>s+hbe[k],0)} hari.</p>`+gj+gn+
+        `<p class="hint">Selisih tidak selalu berarti salah baca: kotak berwarna di PDF kadang tidak sama dengan tulisan keterangannya. Anda bisa menyimpan dulu lalu memperbaiki lewat tabel agenda di bawah.</p>`}
+
+    $('kr').oninput=$('kr').onchange=ev=>{if(ev.target.closest('table')&&ev.target.closest('#kb')==null)cocokkan()};
+    cocokkan();
+
+    q('#ks').onclick=async()=>{
+      try{const lama=await S.db.list('kalender',{},1),
+          kunci=new Set(lama.flatMap(x=>[x.tanggal+'|'+(x.sampai||'')+'|'+x.jenis,x.tanggal+'|'+(x.ket||'')])),
+          baru=ambil().filter(r=>r.pilih&&r.ket&&!kunci.has(r.tanggal+'|'+(r.sampai||'')+'|'+r.jenis)&&!kunci.has(r.tanggal+'|'+r.ket))
+            .map(({tanggal,sampai,jenis,ket})=>({tanggal,sampai,jenis,ket}));
+        if(!baru.length)return S.toast('Tidak ada agenda baru untuk disimpan');
+        await S.db.addMany('kalender',baru);$('kr').innerHTML='';S.toast(baru.length+' agenda diimpor');muat()}
+      catch(er){S.toast(er.message,1)}}}
+
   $('ki').onclick=async()=>{
     try{const ada=await S.db.list('kalender',{},1),kunci=new Set(ada.map(x=>x.tanggal+'|'+(x.ket||''))),
         baru=KONSEL_2425.filter(([t,,,k])=>!kunci.has(t+'|'+k)).map(([tanggal,sampai,jenis,ket])=>({tanggal,sampai,jenis,ket}));

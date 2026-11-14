@@ -3,7 +3,8 @@
    Dipakai halaman yang bentuknya "tabel + tombol + Tambah": Siswa, Jurnal, Tujuan, Materi,
    Pelanggaran, Sikap, Remedial, Pengayaan, Jadwal, Kalender.
    Konfigurasi tiap halaman: coll (nama koleksi), f (isian formulir), cols (kolom tabel),
-   sort, before (kotak di atas tabel), fix (perapian isian).
+   sort, before (kotak di atas tabel), fix (perapian isian), grup (opsional: fungsi r→label untuk membagi tabel
+   menjadi beberapa kelompok berjudul, mis. Kalender per semester; tanpa grup tabel tetap satu).
    Juga memuat: D/date (kolom & isian tanggal) dan kelasPage ([F-umum] kerangka "pilih kelas → tabel → cetak/ekspor",
    dipakai Rekap Nilai, Nilai Akhir, Leger).
    Ubah di sini bila: perilaku tombol Tambah/Ubah/Hapus/Cari/Ekspor semua halaman ikut berubah.
@@ -19,7 +20,12 @@ const crud=c=>async v=>{
     f.list?`<input id="${i}" list="dl_${i}" value="${e(x)}" autocomplete="off"><datalist id="dl_${i}">${f.list.map(o=>`<option value="${e(o)}">`).join('')}</datalist>`:
     `<input id="${i}" type="${f.t||'text'}" value="${e(x)}" ${f.t==='number'?'step="any"':''}>`};
   const list=()=>rows.filter(r=>(!kf||r.kelas===kf)&&(!q||JSON.stringify(Object.values(r)).toLowerCase().includes(q))).sort(c.sort||byT);
-  const draw=()=>{$('tbl').innerHTML=tbl([...c.cols.map(x=>x[1]),'Aksi'],list().map(r=>[...c.cols.map(x=>x[2]?x[2](r,{sis,rows}):e(r[x[0]]??'')),`<button class="btn2 ghost" data-e="${r.id}">Ubah</button> <button class="btn2 del" data-d="${r.id}">Hapus</button>`]),'Belum ada data. Klik "+ Tambah".')};
+  /* c.grup = fungsi r→label kelompok (opsional). Tiap kelompok jadi satu tabel berjudul, urutan kelompok mengikuti urutan baris setelah diurutkan. */
+  const draw=()=>{const H=[...c.cols.map(x=>x[1]),'Aksi'],L=list(),
+      baris=r=>[...c.cols.map(x=>x[2]?x[2](r,{sis,rows}):e(r[x[0]]??'')),`<button class="btn2 ghost" data-e="${r.id}">Ubah</button> <button class="btn2 del" data-d="${r.id}">Hapus</button>`];
+    if(!c.grup){$('tbl').innerHTML=tbl(H,L.map(baris),'Belum ada data. Klik "+ Tambah".');return}
+    const G=new Map();L.forEach(r=>{const k=c.grup(r);G.set(k,[...(G.get(k)||[]),r])});
+    $('tbl').innerHTML=G.size?[...G].map(([k,g],i)=>`<h3 style="margin:${i?'18px':'0'} 0 6px">${e(k)} <span class="hint">(${g.length} data)</span></h3>`+tbl(H,g.map(baris))).join(''):tbl(H,[],'Belum ada data. Klik "+ Tambah".')};
   const ld=async()=>{[rows,sis]=await Promise.all([S.db.list(c.coll),S.db.list('siswa')]);if(c.coll!=='siswa'){sis=U.diampu(sis);rows=rows.filter(r=>!r.siswaId||sis.some(s=>s.id===r.siswaId))}if(c.before)$('bf').innerHTML=await c.before(rows,sis);draw()};
   v.innerHTML=tb(`<input id="q" placeholder="Cari…" aria-label="Cari">${hasK?`<select id="kf" aria-label="Filter kelas"><option value="">Semua kelas</option>${opt(c.kel||K)}</select>`:''}<span class="sp"></span><button class="btn2 ghost" id="ex">Ekspor CSV</button><button class="btn2" id="ad">+ Tambah</button>`)+'<div id="bf"></div><div class="box hide" id="fm" style="margin-bottom:14px"></div><div class="box" id="tbl"></div>';
   /* c.multi = daftar kunci isian yang boleh diulang dalam satu kali simpan (mis. ['jam','kelas','mapel']); isian lain dipakai bersama. Hanya saat Tambah, bukan Ubah. */
