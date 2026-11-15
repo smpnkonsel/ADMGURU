@@ -1,10 +1,16 @@
 /* ADM Guru Pembelajaran – akun & penyimpanan data. Muat SETELAH app.js.
    Isi FIREBASE_CONFIG dengan konfigurasi proyek Firebase Anda (Firebase Console > Project settings > Your apps > Web app).
    Jika diubah menjadi null, aplikasi berjalan dalam MODE PERCOBAAN: akun dan data hanya tersimpan di peramban ini.
-   Dengan Firebase: setiap akun punya data sendiri di Firestore pada  users/{uid}/…  (dikunci oleh firestore.rules). */
+   Dengan Firebase: setiap akun punya data sendiri di Firestore pada  users/{uid}/…  (dikunci oleh firestore.rules).
+
+   INGAT SAYA: pilihan disimpan di localStorage 'adm_ingat'.
+   - '1' (bawaan): sesi disimpan permanen di perangkat (persistence LOCAL), guru tidak perlu masuk lagi.
+   - '0': sesi hanya sampai tab/peramban ditutup (persistence SESSION) dan cache offline Firestore dimatikan. */
 (function(){
   const A = window.ADM;
- const FIREBASE_CONFIG = {
+  if (!A) { console.error('app.js belum dimuat. Muat assets/app.js sebelum firebase-config.js.'); return; }
+
+  const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAESSx8aoZThCaSJ5TSogSOrzDf7gKDVUU",
     authDomain: "apk-pembelajaran-3a72e.firebaseapp.com",
     projectId: "apk-pembelajaran-3a72e",
@@ -13,66 +19,130 @@
     appId: "1:559813710476:web:3e32b243fa2ede253a61a9",
     measurementId: "G-F4B096YQEP"
   };
-  /* Contoh (tempel hasil dari Firebase Console, tanpa "npm install"):
-  const FIREBASE_CONFIG = { apiKey:"AIza…", authDomain:"proyek-anda.firebaseapp.com", projectId:"proyek-anda", storageBucket:"proyek-anda.appspot.com", messagingSenderId:"123…", appId:"1:123…:web:abc…" }; */
 
   const FB = !!FIREBASE_CONFIG;
-  const ERR = {'auth/invalid-credential':'Email atau kata sandi salah.','auth/wrong-password':'Email atau kata sandi salah.','auth/user-not-found':'Email belum terdaftar. Silakan daftar dulu.','auth/email-already-in-use':'Email ini sudah terdaftar. Silakan masuk.','auth/weak-password':'Kata sandi minimal 6 karakter.','auth/invalid-email':'Format email tidak valid.','auth/too-many-requests':'Terlalu banyak percobaan. Coba lagi beberapa saat.','auth/account-exists-with-different-credential':'Email ini sudah terdaftar dengan cara masuk lain. Masuk dengan email dan kata sandi dulu.','auth/provider-already-linked':'Kata sandi untuk akun ini sudah dibuat. Silakan masuk dengan email dan kata sandi.','auth/credential-already-in-use':'Kredensial ini sudah dipakai akun lain.','auth/requires-recent-login':'Sesi sudah lama. Masuk dengan Google lagi lalu coba buat kata sandi.','auth/popup-closed-by-user':'Jendela Google ditutup sebelum selesai.','auth/popup-blocked':'Popup diblokir peramban. Izinkan popup lalu coba lagi.','auth/unauthorized-domain':'Domain ini belum ditambahkan di Authorized domains Firebase (Authentication > Settings).','auth/operation-not-allowed':'Metode masuk ini belum diaktifkan di Firebase Authentication.','auth/network-request-failed':'Tidak ada koneksi internet.'};
+  const MIN_SANDI = 8;
+  const ERR = {
+    'auth/invalid-credential':'Email atau kata sandi salah.',
+    'auth/wrong-password':'Email atau kata sandi salah.',
+    'auth/user-not-found':'Email belum terdaftar. Silakan daftar dulu.',
+    'auth/email-already-in-use':'Email ini sudah terdaftar. Silakan masuk.',
+    'auth/weak-password':'Kata sandi minimal ' + MIN_SANDI + ' karakter.',
+    'auth/invalid-email':'Format email tidak valid.',
+    'auth/user-disabled':'Akun ini dinonaktifkan.',
+    'auth/too-many-requests':'Terlalu banyak percobaan. Coba lagi beberapa saat.',
+    'auth/account-exists-with-different-credential':'Email ini sudah terdaftar dengan cara masuk lain. Masuk dengan email dan kata sandi dulu.',
+    'auth/provider-already-linked':'Kata sandi untuk akun ini sudah dibuat. Silakan masuk dengan email dan kata sandi.',
+    'auth/credential-already-in-use':'Kredensial ini sudah dipakai akun lain.',
+    'auth/requires-recent-login':'Sesi sudah lama. Masuk dengan Google lagi lalu coba buat kata sandi.',
+    'auth/popup-closed-by-user':'Jendela Google ditutup sebelum selesai.',
+    'auth/cancelled-popup-request':'Permintaan masuk dibatalkan. Coba klik sekali lagi.',
+    'auth/popup-blocked':'Popup diblokir peramban. Izinkan popup lalu coba lagi.',
+    'auth/unauthorized-domain':'Domain ini belum ditambahkan di Authorized domains Firebase (Authentication > Settings).',
+    'auth/operation-not-allowed':'Metode masuk ini belum diaktifkan di Firebase Authentication.',
+    'auth/network-request-failed':'Tidak ada koneksi internet.',
+    'auth/web-storage-unsupported':'Peramban memblokir penyimpanan. Aktifkan cookie/penyimpanan situs, atau keluar dari mode privat.'
+  };
   const U = r => ({uid:r.uid, email:r.email, nama:r.displayName || '', foto:r.photoURL || ''});
   const pesan = er => new Error(ERR[er.code] || er.message || 'Terjadi kesalahan.');
+
+  /* ===== pilihan "Ingat saya" ===== */
+  const ingat = () => { try { return localStorage.getItem('adm_ingat') !== '0'; } catch(_) { return true; } };
+
   let fb = null;
   const load = src => new Promise((ok,no) => { const t = document.createElement('script'); t.src = src; t.onload = ok; t.onerror = () => no(new Error('Gagal memuat Firebase. Periksa koneksi internet.')); document.head.appendChild(t); });
   const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-';
+  const modeAuth = () => ingat() ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
+
   function init(){
     return fb || (fb = (async () => {
       await load(SDK + 'app-compat.js');
       await Promise.all([load(SDK + 'auth-compat.js'), load(SDK + 'firestore-compat.js')]);   // paralel
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-      const db = firebase.firestore();
-      try { db.settings({experimentalAutoDetectLongPolling:true}); } catch(_) {}   // membantu di jaringan sekolah/seluler yang menghambat WebChannel
-      return {auth:firebase.auth(), db};
+      const auth = firebase.auth(), db = firebase.firestore();
+      try { db.settings({experimentalAutoDetectLongPolling:true, merge:true}); } catch(_) {}   // membantu di jaringan sekolah/seluler yang menghambat WebChannel
+      try { await auth.setPersistence(modeAuth()); } catch(_) {}                                // sesi login diingat sesuai pilihan
+      if (ingat()) { try { await db.enablePersistence({synchronizeTabs:true}); } catch(_) {} }  // cache offline (gagal diam-diam bila tidak didukung)
+      return {auth, db};
     })().catch(er => { fb = null; throw er; }));
   }
-  if (FB) init().catch(() => {});   // mulai memuat Firebase segera, tidak menunggu halaman memanggilnya
-  const lget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(_) { return d; } }, lset = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+  if (FB) init().catch(() => {});   // mulai memuat Firebase segera
+
+  const lget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(_) { return d; } };
+  const lset = (k, v) => localStorage.setItem(k, JSON.stringify(v));
   const sha = async s => { try { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('adm|' + s)))].map(b => b.toString(16).padStart(2,'0')).join(''); } catch(_) { return btoa(unescape(encodeURIComponent(s))); } };
+
+  /* Sesi mode lokal: localStorage bila diingat, sessionStorage bila tidak */
+  const sesiStore = () => ingat() ? localStorage : sessionStorage;
+  const sesiGet = () => { try { return localStorage.getItem('adm_sesi') || sessionStorage.getItem('adm_sesi'); } catch(_) { return null; } };
+  const sesiSet = e => { try { localStorage.removeItem('adm_sesi'); sessionStorage.removeItem('adm_sesi'); sesiStore().setItem('adm_sesi', e); } catch(_) {} };
+  const sesiHapus = () => { try { localStorage.removeItem('adm_sesi'); sessionStorage.removeItem('adm_sesi'); } catch(_) {} };
+
+  const gUser = r => ({...U(r), hasPassword:r.providerData.some(p => p.providerId === 'password')});
 
   /* ===== akun ===== */
   A.auth = {
     mode: FB ? 'firebase' : 'lokal',
+    ingat,
+    /* Simpan pilihan "Ingat saya" dan terapkan ke Firebase sebelum masuk. */
+    async setIngat(v){
+      try { localStorage.setItem('adm_ingat', v ? '1' : '0'); } catch(_) {}
+      if (FB) { try { await (await init()).auth.setPersistence(modeAuth()); } catch(_) {} }
+    },
     async current(){
-      if (!FB) { const e = localStorage.getItem('adm_sesi'), a = lget('adm_akun', {})[e]; return a ? {uid:a.uid, email:e} : null; }
+      if (!FB) { const e = sesiGet(), a = e && lget('adm_akun', {})[e]; return a ? {uid:a.uid, email:e} : null; }
       const f = await init();
       return new Promise(ok => { const u = f.auth.onAuthStateChanged(x => { u(); ok(x ? U(x) : null); }); });
     },
     async login(email, pw){
       email = email.trim().toLowerCase();
-      if (!FB) { const a = lget('adm_akun', {})[email]; if (!a || a.h !== await sha(pw)) throw new Error('Email atau kata sandi salah.'); localStorage.setItem('adm_sesi', email); return {uid:a.uid, email}; }
+      if (!FB) { const a = lget('adm_akun', {})[email]; if (!a || a.h !== await sha(pw)) throw new Error('Email atau kata sandi salah.'); sesiSet(email); return {uid:a.uid, email}; }
       try { return U((await (await init()).auth.signInWithEmailAndPassword(email, pw)).user); } catch(er) { throw pesan(er); }
     },
     async register(email, pw, nama){
       email = email.trim().toLowerCase();
+      if (pw.length < MIN_SANDI) throw new Error(ERR['auth/weak-password']);
       if (!FB) {
-        const ak = lget('adm_akun', {}); if (ak[email]) throw new Error(ERR['auth/email-already-in-use']); if (pw.length < 6) throw new Error(ERR['auth/weak-password']);
-        ak[email] = {uid:'u_' + email.replace(/[^a-z0-9]/g, '_'), h:await sha(pw)}; lset('adm_akun', ak); localStorage.setItem('adm_sesi', email); return {uid:ak[email].uid, email};
+        const ak = lget('adm_akun', {}); if (ak[email]) throw new Error(ERR['auth/email-already-in-use']);
+        ak[email] = {uid:'u_' + email.replace(/[^a-z0-9]/g, '_'), h:await sha(pw)}; lset('adm_akun', ak); sesiSet(email); return {uid:ak[email].uid, email};
       }
-      try { const r = (await (await init()).auth.createUserWithEmailAndPassword(email, pw)).user; if (nama) await r.updateProfile({displayName:nama}); return U(r); } catch(er) { throw pesan(er); }
+      try {
+        const r = (await (await init()).auth.createUserWithEmailAndPassword(email, pw)).user;
+        if (nama) await r.updateProfile({displayName:nama});
+        r.sendEmailVerification().catch(() => {});   // kirim verifikasi email, tidak memblokir pendaftaran
+        return U(r);
+      } catch(er) { throw pesan(er); }
     },
+    /* Mengembalikan data pengguna bila popup berhasil, atau null bila dialihkan lewat redirect (hasil diambil redirectResult()). */
     async google(){
       if (!FB) throw new Error('Masuk dengan Google memerlukan Firebase.');
-      try { const f = await init(), r = (await f.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())).user; return {...U(r), hasPassword:r.providerData.some(p => p.providerId === 'password')}; } catch(er) { throw pesan(er); }
+      const f = await init(), prov = new firebase.auth.GoogleAuthProvider();
+      try { return gUser((await f.auth.signInWithPopup(prov)).user); }
+      catch(er) {
+        if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(er.code)) {
+          try { await f.auth.signInWithRedirect(prov); return null; } catch(e2) { throw pesan(e2); }
+        }
+        throw pesan(er);
+      }
+    },
+    /* Dipanggil saat halaman login dimuat: ambil hasil masuk Google lewat redirect (null bila tidak ada). */
+    async redirectResult(){
+      if (!FB) return null;
+      const f = await init();
+      try { const r = await f.auth.getRedirectResult(); return r && r.user ? gUser(r.user) : null; } catch(er) { throw pesan(er); }
     },
     async linkPassword(pw){
+      if (pw.length < MIN_SANDI) throw new Error(ERR['auth/weak-password']);
       try { const u = (await init()).auth.currentUser; await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, pw)); } catch(er) { throw pesan(er); }
     },
     async reset(email){
       if (!FB) throw new Error('Reset kata sandi tersedia setelah Firebase dihubungkan.');
       try { await (await init()).auth.sendPasswordResetEmail(email.trim()); } catch(er) { throw pesan(er); }
     },
-    async logout(){ if (!FB) return localStorage.removeItem('adm_sesi'); await (await init()).auth.signOut(); }
+    async logout(){ if (!FB) return sesiHapus(); await (await init()).auth.signOut(); }
   };
 
-  /* Dipanggil di setiap halaman: pastikan sudah masuk, lalu muat profil akun. */
+  /* Dipanggil di setiap halaman: pastikan sudah masuk (sesi tersimpan dipulihkan otomatis), lalu muat profil akun. */
   A.boot = async () => {
     const u = await A.auth.current();
     if (!u) { location.replace(A.base + 'login.html'); return false; }

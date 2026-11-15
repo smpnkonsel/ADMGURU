@@ -1,8 +1,10 @@
-/* ADM Guru Pembelajaran – inti aplikasi: tema, fungsi bantu, data guru yang sedang masuk. Muat PERTAMA di setiap halaman. */
+/* ADM Guru Pembelajaran – inti aplikasi: tema, fungsi bantu, data guru yang sedang masuk. Muat PERTAMA di setiap halaman.
+   Catatan: muat dengan <script src="…/app.js"></script> biasa (tanpa async/defer/module) karena S.base memakai document.currentScript. */
 (function(){
   const S = window.ADM = window.ADM || {};
   S.NAMA = 'ADM Guru Pembelajaran';
-  S.base = new URL('../', document.currentScript.src).href;
+  const sumber = document.currentScript ? document.currentScript.src : (location.origin + location.pathname.replace(/[^/]*$/, '') + 'assets/app.js');
+  S.base = new URL('../', sumber).href;
   S.KKTP = 75;
   S.guru = {nama:'', mapel:'', mapelList:[], kelas:[], semuaKelas:[], foto:'', nip:'', hp:'', email:''};
   /* mapel = mapel aktif; mapelList = semua mapel [{nama, kelas:[…]}]; kelas = kelas untuk mapel aktif; semuaKelas = semua kelas diampu */
@@ -11,7 +13,8 @@
      S.refresh disediakan sidebar.js; bila belum ada, jatuh ke reload biasa. */
   S.setMapel = async n => {
     try { localStorage.setItem('adm_mapel_' + S.uid, n); } catch(_) {}
-    try { await S.profile.load(); S.refresh ? S.refresh() : location.reload(); } catch(_) { location.reload(); }
+    try { await S.profile.load(); } catch(_) { S.toast('Gagal memuat data mapel. Memuat ulang halaman…', true); setTimeout(() => location.reload(), 900); return; }
+    S.refresh ? S.refresh() : location.reload();
   };   // S.uid diisi dari akun yang masuk (lihat firebase-config.js)
 
   /* Perapian otomatis: kelas → "VII A" (7a, 7 A, VIia, viiA semuanya jadi VII A); nama → huruf besar di awal tiap kata */
@@ -37,12 +40,18 @@
   S.esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   S.toast = (msg, err) => {
     const d = document.createElement('div'); d.className = 'toast' + (err ? ' err' : ''); d.textContent = msg;
+    d.setAttribute('role', err ? 'alert' : 'status');
     document.body.appendChild(d); setTimeout(() => d.remove(), 2800);
   };
+
+  /* Ekspor CSV. Sel yang diawali = + - @ diberi awalan ' agar tidak dibaca Excel sebagai rumus (CSV injection). */
   S.csv = (nama, baris) => {
-    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const aman = v => { v = String(v ?? ''); return /^[=+\-@\t\r]/.test(v) && !/^-?\d+([.,]\d+)?$/.test(v) ? "'" + v : v; };
+    const q = v => '"' + aman(v).replace(/"/g, '""') + '"';
     const blob = new Blob(['\ufeff' + baris.map(r => r.map(q).join(',')).join('\n')], {type:'text/csv;charset=utf-8'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nama; a.click(); URL.revokeObjectURL(a.href);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nama;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);   // ditunda agar unduhan tidak gagal di Safari
   };
 
   /* Foto profil: tautan Google Drive ("Siapa saja yang memiliki link") diubah otomatis menjadi alamat gambar. */
@@ -51,10 +60,15 @@
     const m = u.match(/\/d\/([\w-]{10,})/) || u.match(/[?&]id=([\w-]{10,})/);
     return m && /(drive|docs)\.google\.com/.test(u) ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400' : u;
   };
+  /* Bila gambar gagal dimuat, diganti huruf inisial. Inisial dibaca dari data-i (bukan disisipkan ke kode onerror). */
+  S.fotoGagal = img => {
+    const sp = document.createElement('span'); sp.className = img.className + ' ph'; sp.textContent = img.dataset.i || '?';
+    img.replaceWith(sp);
+  };
   S.avatar = (cls, g = S.guru) => {
     let i = ((g.nama || g.email || '?').replace(/^(Bu|Pak|Ibu|Bapak)\s+/i, '').trim()[0] || '?').toUpperCase(); if (!/[A-Z0-9]/.test(i)) i = '?';
     const f = S.fotoUrl(g.foto);
-    return f ? `<img class="${cls}" src="${S.esc(f)}" alt="Foto ${S.esc(g.nama)}" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'${cls} ph',textContent:'${i}'}))">`
-             : `<span class="${cls} ph">${i}</span>`;
+    return f ? `<img class="${S.esc(cls)}" src="${S.esc(f)}" data-i="${i}" alt="Foto ${S.esc(g.nama)}" referrerpolicy="no-referrer" onerror="ADM.fotoGagal(this)">`
+             : `<span class="${S.esc(cls)} ph">${i}</span>`;
   };
 })();

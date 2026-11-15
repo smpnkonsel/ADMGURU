@@ -2,69 +2,63 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Masuk – ADM Guru Pembelajaran</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="assets/app.js"></script>
 <script src="assets/firebase-config.js"></script>
 <style>
-:root{--bg:#eef2f1;--panel:#fff;--ink:#14272a;--mute:#5f7376;--line:#d8e1df;--side:#0f3d3e;--side2:#16504f;--brand:#1f7a6d;--brand2:#e0f1ee;--warn:#c98a0b;--warn2:#fbf0d6;--bad:#c0392b;--bad2:#fae1dd;--ok:#2a8a4a;--ok2:#dff3e5;--sh:0 1px 2px rgba(15,61,62,.08),0 4px 14px rgba(15,61,62,.05)}
-[data-theme=dark]{--bg:#0d1819;--panel:#142426;--ink:#e4efed;--mute:#8da5a7;--line:#25393b;--side:#091d1e;--side2:#12302f;--brand:#46b8a6;--brand2:#173533;--warn:#e5b04a;--warn2:#3a2f14;--bad:#ee7b6c;--bad2:#40201c;--ok:#5bc27c;--ok2:#17331f;--sh:none}
+:root{--bg:#eef2f1;--panel:#fff;--ink:#14272a;--mute:#5f7376;--line:#d8e1df;--brand:#1f7a6d;--brand2:#e0f1ee;--bad:#c0392b;--ok:#2a8a4a;--sh:0 1px 2px rgba(15,61,62,.08),0 4px 14px rgba(15,61,62,.05)}
+[data-theme=dark]{--bg:#0d1819;--panel:#142426;--ink:#e4efed;--mute:#8da5a7;--line:#25393b;--brand:#46b8a6;--brand2:#173533;--bad:#ee7b6c;--ok:#5bc27c;--sh:none}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
 body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-
-#login{min-height:100%;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,var(--side),var(--side2))}
-.lbox{background:var(--panel);border-radius:14px;padding:32px;width:100%;max-width:410px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
-.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:.5px}
-.logo i{width:38px;height:38px;border-radius:10px;background:var(--brand);color:#fff;display:grid;place-items:center;font-style:normal;font-size:18px}
-.lbox p.sub{color:var(--mute);margin:6px 0 16px}
-label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px}
-input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
-.btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:700;width:100%;margin-top:18px}
-.btn:hover{filter:brightness(1.1)}
-.btn:disabled{opacity:.6;cursor:wait}
-.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--brand2);border-radius:8px;padding:4px;margin-bottom:4px}
-.tabs button{border:0;background:transparent;border-radius:6px;padding:8px;font-weight:700;color:var(--mute)}
-.tabs button[aria-selected=true]{background:var(--panel);color:var(--brand);box-shadow:var(--sh)}
-.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:14px;padding:10px 16px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-weight:600}
-.gbtn:hover{background:var(--brand2)}
-.gbtn svg{width:18px;height:18px}
-.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:12px;margin-top:14px}
-.or:before,.or:after{content:"";flex:1;height:1px;background:var(--line)}
-.demo{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;font-size:12.5px;color:var(--mute)}
-.demo button{display:block;width:100%;text-align:left;background:var(--brand2);border:0;border-radius:6px;padding:7px 10px;margin-top:6px}
-.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px}
-.err.ok{color:var(--ok)}
-.pwbox{position:relative}
-.pwbox input{padding-right:70px}
-.pwbox .lihat{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--brand2);border:0;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--brand)}
-.lupa{display:block;margin:12px auto 0;background:none;border:0;color:var(--brand);font-weight:600;font-size:13px;text-decoration:underline;padding:4px}
 [hidden]{display:none!important}
-/* tema baru */
-#login{position:relative;overflow:hidden;background:radial-gradient(700px 420px at 12% 8%,#1f7a74 0,transparent 60%),radial-gradient(640px 460px at 92% 96%,#3b3f8f 0,transparent 58%),linear-gradient(140deg,#082a2e,#0f4244 60%,#14524f)}
+
+#login{position:relative;overflow:hidden;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:20px;
+  background:radial-gradient(700px 420px at 12% 8%,#1f7a74 0,transparent 60%),radial-gradient(640px 460px at 92% 96%,#3b3f8f 0,transparent 58%),linear-gradient(140deg,#082a2e,#0f4244 60%,#14524f)}
 #login::before,#login::after{content:"";position:absolute;border-radius:50%;filter:blur(2px);pointer-events:none}
 #login::before{width:360px;height:360px;right:-90px;top:-110px;background:radial-gradient(circle at 30% 30%,rgba(201,164,92,.55),rgba(201,164,92,0) 70%)}
 #login::after{width:300px;height:300px;left:-80px;bottom:-90px;background:radial-gradient(circle at 60% 40%,rgba(90,209,189,.35),rgba(90,209,189,0) 70%)}
-.lbox{position:relative;z-index:1;border-radius:26px;padding:38px 34px;max-width:430px;border:1px solid rgba(255,255,255,.55);box-shadow:0 30px 70px -20px rgba(0,0,0,.55)}
-.logo{font-family:'Fraunces',Georgia,serif;font-size:22px;letter-spacing:0}
-.logo i{background:linear-gradient(135deg,#2fb8a4,#c9a45c);color:#08282b;border-radius:12px;box-shadow:0 8px 16px -8px rgba(23,137,122,.8)}
-input,select{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;background:color-mix(in srgb,var(--brand2) 30%,var(--panel));transition:border-color .15s,box-shadow .15s,background .15s}
+.lbox{position:relative;z-index:1;background:var(--panel);border-radius:26px;padding:38px 34px;width:100%;max-width:430px;border:1px solid rgba(255,255,255,.55);box-shadow:0 30px 70px -20px rgba(0,0,0,.55)}
+.logo{display:flex;align-items:center;gap:10px;font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px}
+.logo i{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#2fb8a4,#c9a45c);color:#08282b;display:grid;place-items:center;font-style:normal;font-size:18px;box-shadow:0 8px 16px -8px rgba(23,137,122,.8)}
+.lbox p.sub{color:var(--mute);margin:6px 0 16px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px}
+input[type=email],input[type=password],input[type=text]{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--brand2) 30%,var(--panel));transition:border-color .15s,box-shadow .15s,background .15s}
 input:hover{border-color:color-mix(in srgb,var(--brand) 40%,var(--line))}
 input:focus{outline:0;border-color:var(--brand);background:var(--panel);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 18%,transparent)}
-.btn{background:linear-gradient(135deg,#21a897,#17897a 55%,#117066);border-radius:12px;padding:12px 16px;box-shadow:0 10px 18px -10px rgba(23,137,122,.8);transition:transform .12s}
-.btn:hover{transform:translateY(-1px);filter:none}
-.tabs{background:var(--brand2);border-radius:12px;padding:5px}.tabs button{border-radius:9px;padding:9px}
-.gbtn{border-radius:12px;padding:12px 16px;transition:box-shadow .15s,transform .12s}.gbtn:hover{background:var(--panel);box-shadow:var(--sh);transform:translateY(-1px)}
-
-@media(max-width:480px){.lbox{padding:24px 18px}input,select{font-size:16px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.btn{background:linear-gradient(135deg,#21a897,#17897a 55%,#117066);color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:700;width:100%;margin-top:18px;box-shadow:0 10px 18px -10px rgba(23,137,122,.8);transition:transform .12s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.6;cursor:wait}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--brand2);border-radius:12px;padding:5px;margin-bottom:4px}
+.tabs button{border:0;background:transparent;border-radius:9px;padding:9px;font-weight:700;color:var(--mute)}
+.tabs button[aria-selected=true]{background:var(--panel);color:var(--brand);box-shadow:var(--sh)}
+.ingat{display:flex;align-items:flex-start;gap:10px;margin:14px 0 0;font-weight:600;cursor:pointer}
+.ingat input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand);flex:none}
+.ingat small{display:block;font-weight:400;color:var(--mute);font-size:12px}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:14px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);font-weight:600;transition:box-shadow .15s,transform .12s}
+.gbtn:hover{box-shadow:var(--sh);transform:translateY(-1px)}
+.gbtn svg{width:18px;height:18px}
+.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:12px;margin-top:14px}
+.or:before,.or:after{content:"";flex:1;height:1px;background:var(--line)}
+.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px}
+.err.ok{color:var(--ok)}
+.pwbox{position:relative}
+.pwbox input{padding-right:84px}
+.pwbox .lihat{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--brand2);border:0;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--brand)}
+.lupa{display:block;margin:12px auto 0;background:none;border:0;color:var(--brand);font-weight:600;font-size:13px;text-decoration:underline;padding:4px}
+/* layar pemeriksaan sesi */
+#cek{text-align:center;padding:30px 0}
+.spin{width:34px;height:34px;border:4px solid var(--brand2);border-top-color:var(--brand);border-radius:50%;margin:0 auto 12px;animation:putar .8s linear infinite}
+@keyframes putar{to{transform:rotate(360deg)}}
+@media(max-width:480px){.lbox{padding:24px 18px}input{font-size:16px!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:.01ms!important}}
 </style>
 </head>
 <body>
@@ -72,94 +66,140 @@ input:focus{outline:0;border-color:var(--brand);background:var(--panel);box-shad
 <section id="login">
   <div class="lbox">
     <div class="logo"><i>▣</i><span>ADM Guru Pembelajaran</span></div>
-    <p class="sub">Administrasi guru untuk semua guru. Masuk atau daftar; data tiap akun tersimpan terpisah.</p>
 
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tMasuk" aria-selected="true" onclick="tab('masuk')">Masuk</button>
-      <button type="button" role="tab" id="tDaftar" aria-selected="false" onclick="tab('daftar')">Daftar</button>
+    <!-- Tampil sementara saat memeriksa apakah akun masih tersimpan -->
+    <div id="cek" role="status"><div class="spin"></div><div>Memeriksa sesi masuk…</div></div>
+
+    <div id="isi" hidden>
+      <p class="sub">Administrasi guru untuk semua guru. Masuk atau daftar; data tiap akun tersimpan terpisah.</p>
+
+      <div class="tabs" role="tablist" aria-label="Pilih masuk atau daftar">
+        <button type="button" role="tab" id="tMasuk" aria-selected="true" aria-controls="fMasuk" onclick="tab('masuk')">Masuk</button>
+        <button type="button" role="tab" id="tDaftar" aria-selected="false" aria-controls="fDaftar" onclick="tab('daftar')">Daftar</button>
+      </div>
+
+      <label class="ingat" id="ingatBox" for="ingat">
+        <input type="checkbox" id="ingat" checked>
+        <span>Ingat saya di perangkat ini<small>Tidak perlu masuk lagi saat membuka aplikasi. Hilangkan centang jika memakai komputer bersama.</small></span>
+      </label>
+
+      <button class="gbtn" type="button" onclick="doGoogle()">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+        Lanjutkan dengan Google
+      </button>
+      <div class="or">atau dengan email</div>
+
+      <!-- MASUK -->
+      <form id="fMasuk" role="tabpanel" aria-labelledby="tMasuk" onsubmit="return doLogin(event)">
+        <label for="em">Email guru</label><input id="em" type="email" autocomplete="username" required>
+        <label for="pw">Kata sandi</label><input id="pw" type="password" autocomplete="current-password" required>
+        <button class="btn" type="submit">Masuk</button>
+        <button class="lupa" type="button" onclick="doLupa()">Lupa kata sandi?</button>
+      </form>
+
+      <!-- DAFTAR -->
+      <form id="fDaftar" role="tabpanel" aria-labelledby="tDaftar" onsubmit="return doDaftar(event)" hidden>
+        <label for="rn">Nama lengkap</label><input id="rn" type="text" autocomplete="name" required>
+        <label for="re">Email</label><input id="re" type="email" autocomplete="username" required>
+        <label for="rp">Kata sandi (min. 8 karakter)</label><input id="rp" type="password" autocomplete="new-password" minlength="8" required>
+        <label for="rp2">Ulangi kata sandi</label><input id="rp2" type="password" autocomplete="new-password" minlength="8" required>
+        <button class="btn" type="submit">Buat akun</button>
+      </form>
+
+      <!-- Muncul setelah masuk lewat Google -->
+      <form id="fSandi" onsubmit="return doSandi(event)" hidden>
+        <h2 style="font-size:16px;margin:18px 0 4px">Buat kata sandi ADM</h2>
+        <p class="sub" style="margin:0 0 4px">Dengan kata sandi ini, email Google Anda juga bisa dipakai untuk masuk lewat kolom email dan sandi. Langkah ini boleh dilewati.</p>
+        <label for="sp">Kata sandi baru (min. 8 karakter)</label><input id="sp" type="password" autocomplete="new-password" minlength="8" required>
+        <label for="sp2">Ulangi kata sandi</label><input id="sp2" type="password" autocomplete="new-password" minlength="8" required>
+        <button class="btn" type="submit">Simpan kata sandi</button>
+        <button class="lupa" type="button" onclick="lewatiSandi()">Lewati, lanjut ke dasbor</button>
+      </form>
+
+      <div class="err" id="err" role="status" aria-live="polite"></div>
     </div>
-
-    <button class="gbtn" type="button" onclick="doGoogle()">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
-      Lanjutkan dengan Google
-    </button>
-    <div class="or">atau dengan email</div>
-
-    <!-- MASUK -->
-    <form id="fMasuk" onsubmit="return doLogin(event)">
-      <label for="em">Email guru</label><input id="em" type="email" autocomplete="username" required>
-      <label for="pw">Kata sandi</label><input id="pw" type="password" autocomplete="current-password" required>
-      <button class="btn" type="submit">Masuk</button>
-      <button class="lupa" type="button" onclick="doLupa()">Lupa kata sandi?</button>
-    </form>
-
-    <!-- DAFTAR -->
-    <form id="fDaftar" onsubmit="return doDaftar(event)" hidden>
-      <label for="rn">Nama lengkap</label><input id="rn" type="text" autocomplete="name" required>
-      <label for="re">Email</label><input id="re" type="email" autocomplete="username" required>
-      <label for="rp">Kata sandi (min. 6 karakter)</label><input id="rp" type="password" autocomplete="new-password" minlength="6" required>
-      <label for="rp2">Ulangi kata sandi</label><input id="rp2" type="password" autocomplete="new-password" minlength="6" required>
-      <button class="btn" type="submit">Buat akun</button>
-    </form>
-
-    <!-- Muncul setelah masuk lewat Google, agar email yang sama bisa dipakai juga dengan kata sandi -->
-    <form id="fSandi" onsubmit="return doSandi(event)" hidden>
-      <h2 style="font-size:16px;margin:18px 0 4px">Buat kata sandi ADM</h2>
-      <p class="sub" style="margin:0 0 4px">Dengan kata sandi ini, email Google Anda juga bisa dipakai untuk masuk lewat kolom email dan sandi. Langkah ini boleh dilewati.</p>
-      <label for="sp">Kata sandi baru (min. 6 karakter)</label><input id="sp" type="password" autocomplete="new-password" minlength="6" required>
-      <label for="sp2">Ulangi kata sandi</label><input id="sp2" type="password" autocomplete="new-password" minlength="6" required>
-      <button class="btn" type="submit">Simpan kata sandi</button>
-      <button class="lupa" type="button" onclick="lewatiSandi()">Lewati, lanjut ke dasbor</button>
-    </form>
-
-    <div class="err" id="err" role="alert"></div>
-</div>
+  </div>
 </section>
 
 <script>
-/* Halaman login ADM Guru Pembelajaran: masuk, daftar sendiri, dan masuk dengan Google.
-   Konfigurasi Firebase ada di assets/firebase-config.js. Aktifkan "Email/Password" dan "Google" di Firebase Authentication,
-   lalu tambahkan domain hosting di Authentication > Settings > Authorized domains. */
+/* Halaman login ADM Guru Pembelajaran: masuk, daftar, Google, dan ingat sesi.
+   Konfigurasi Firebase ada di assets/firebase-config.js. */
+if (typeof ADM === 'undefined' || !ADM.auth) {
+  document.getElementById('cek').innerHTML = '<p style="color:#c0392b;font-weight:600">Berkas aplikasi gagal dimuat (assets/app.js atau assets/firebase-config.js). Periksa koneksi internet lalu muat ulang halaman.</p>';
+  throw new Error('ADM tidak tersedia');
+}
 const A=ADM, $=id=>document.getElementById(id), FB=A.auth.mode==='firebase';
 try{if(localStorage.getItem('adm-tema')==='dark')document.documentElement.dataset.theme='dark'}catch(_){}
-function pesan(t,ok){const e=$('err');e.textContent=t||'';e.className='err'+(ok?' ok':'')}
+
+function pesan(t,ok){const e=$('err');e.textContent=t||'';e.className='err'+(ok?' ok':'');e.setAttribute('role',ok?'status':'alert')}
 function sibuk(f,s){f.querySelectorAll('button[type=submit]').forEach(b=>b.disabled=s)}
 function tab(w){const m=w==='masuk';$('fMasuk').hidden=!m;$('fDaftar').hidden=m;$('tMasuk').setAttribute('aria-selected',m);$('tDaftar').setAttribute('aria-selected',!m);pesan('')}
-/* Setelah autentikasi: pastikan profil akun ada (nama & foto dari Google bila tersedia), lalu ke dasbor. */
+function tampilForm(){$('cek').hidden=true;$('isi').hidden=false}
+function ingat(){return $('ingat').checked}
+
+/* Setelah autentikasi: pastikan profil ada, lalu ke dasbor. */
 async function masuk(u,nama){
   A.uid=u.uid;A.email=u.email;await A.profile.load();
   const d={};if(!A.guru.nama)d.nama=nama||u.nama||u.email.split('@')[0];if(!A.guru.foto&&u.foto)d.foto=u.foto;
   if(Object.keys(d).length)await A.profile.save(d);
   location.replace('dashboard.html');
 }
+
 async function doLogin(ev){ev.preventDefault();pesan('');sibuk($('fMasuk'),true);
-  try{await masuk(await A.auth.login($('em').value,$('pw').value))}catch(x){pesan(x.message);sibuk($('fMasuk'),false)}return false}
+  try{await A.auth.setIngat(ingat());await masuk(await A.auth.login($('em').value,$('pw').value))}catch(x){pesan(x.message);sibuk($('fMasuk'),false)}return false}
+
 async function doDaftar(ev){ev.preventDefault();const p=$('rp').value;
+  if(p.length<8){pesan('Kata sandi minimal 8 karakter.');return false}
   if(p!==$('rp2').value){pesan('Kata sandi dan pengulangannya tidak sama.');return false}
   pesan('');sibuk($('fDaftar'),true);const nama=$('rn').value.trim();
-  try{await masuk(await A.auth.register($('re').value,p,nama),nama)}catch(x){pesan(x.message);sibuk($('fDaftar'),false)}return false}
+  try{await A.auth.setIngat(ingat());await masuk(await A.auth.register($('re').value,p,nama),nama)}catch(x){pesan(x.message);sibuk($('fDaftar'),false)}return false}
+
 async function doLupa(){const e=$('em').value.trim();if(!e){pesan('Isi kolom Email guru dulu, lalu klik "Lupa kata sandi?".');$('em').focus();return}
   pesan('');try{await A.auth.reset(e);pesan('Jika email itu terdaftar, tautan untuk membuat kata sandi baru sudah dikirim. Cek kotak masuk dan folder spam. Akun yang masuk lewat Google tidak memakai kata sandi ADM.',true)}catch(x){pesan(x.message)}}
+
 /* ---------- Google ---------- */
 let ug=null;
+async function sesudahGoogle(u){
+  let lewat=false;try{lewat=localStorage.getItem('adm-lewati-sandi-'+u.uid)==='1'}catch(_){}
+  if(u.hasPassword||lewat)await masuk(u);else{ug=u;tampilSandi(u)}
+}
 async function doGoogle(){pesan('');
-  try{const u=await A.auth.google();let lewat=false;try{lewat=localStorage.getItem('adm-lewati-sandi-'+u.uid)==='1'}catch(_){}
-    if(u.hasPassword||lewat)await masuk(u);else{ug=u;tampilSandi(u)}}catch(x){pesan(x.message)}}
-function tampilSandi(u){document.querySelectorAll('.tabs,.gbtn,.or,#fMasuk,#fDaftar').forEach(el=>el.hidden=true);$('fSandi').hidden=false;pesan('Berhasil masuk sebagai '+u.email+'.',true);$('sp').focus()}
+  try{
+    await A.auth.setIngat(ingat());
+    const u=await A.auth.google();
+    if(!u){pesan('Mengalihkan ke Google…',true);return}   // memakai redirect; hasilnya diproses saat halaman dimuat lagi
+    await sesudahGoogle(u);
+  }catch(x){pesan(x.message)}}
+function tampilSandi(u){tampilForm();document.querySelectorAll('.tabs,#ingatBox,.gbtn,.or,#fMasuk,#fDaftar').forEach(el=>el.hidden=true);$('fSandi').hidden=false;pesan('Berhasil masuk sebagai '+u.email+'.',true);$('sp').focus()}
 function lewatiSandi(){try{localStorage.setItem('adm-lewati-sandi-'+ug.uid,'1')}catch(_){}masuk(ug).catch(x=>pesan(x.message))}
 async function doSandi(ev){ev.preventDefault();const p=$('sp').value;
+  if(p.length<8){pesan('Kata sandi minimal 8 karakter.');return false}
   if(p!==$('sp2').value){pesan('Kata sandi dan pengulangannya tidak sama.');return false}
   pesan('');sibuk($('fSandi'),true);
   try{await A.auth.linkPassword(p);await masuk(ug)}catch(x){pesan(x.message);sibuk($('fSandi'),false)}return false}
+
 /* ---------- tombol lihat kata sandi ---------- */
 document.querySelectorAll('input[type=password]').forEach(inp=>{
   const w=document.createElement('div');w.className='pwbox';inp.parentNode.insertBefore(w,inp);w.appendChild(inp);
   const b=document.createElement('button');b.type='button';b.className='lihat';b.textContent='Lihat';b.setAttribute('aria-label','Tampilkan kata sandi');b.setAttribute('aria-pressed','false');
   b.onclick=()=>{const t=inp.type==='password';inp.type=t?'text':'password';b.textContent=t?'Sembunyi':'Lihat';b.setAttribute('aria-pressed',t);b.setAttribute('aria-label',t?'Sembunyikan kata sandi':'Tampilkan kata sandi')};
   w.appendChild(b)});
-if(!FB){document.querySelectorAll('.gbtn,.or').forEach(el=>el.hidden=true);pesan('Mode percobaan: Firebase belum aktif, akun hanya tersimpan di peramban ini.')}
-/* Jika sudah masuk, langsung ke dasbor */
-A.auth.current().then(u=>{if(u)location.replace('dashboard.html')}).catch(()=>{});
+
+/* ---------- Saat halaman dibuka: ingat pilihan, proses hasil redirect Google, dan lewati login bila sesi masih ada ---------- */
+$('ingat').checked=A.auth.ingat();
+if(!FB){document.querySelectorAll('.gbtn,.or').forEach(el=>el.hidden=true)}
+(async()=>{
+  try{
+    const g=await A.auth.redirectResult();          // kembali dari Google (jalur redirect)
+    if(g){tampilForm();await sesudahGoogle(g);return}
+  }catch(x){tampilForm();pesan(x.message);return}
+  try{
+    const u=await A.auth.current();                 // sesi tersimpan? langsung ke dasbor
+    if(u){location.replace('dashboard.html');return}
+  }catch(_){}
+  tampilForm();
+  if(!FB)pesan('Mode percobaan: Firebase belum aktif, akun hanya tersimpan di peramban ini.');
+})();
 </script>
 </body>
 </html>
