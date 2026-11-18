@@ -5,7 +5,16 @@
 
    INGAT SAYA: pilihan disimpan di localStorage 'adm_ingat'.
    - '1' (bawaan): sesi disimpan permanen di perangkat (persistence LOCAL), guru tidak perlu masuk lagi.
-   - '0': sesi hanya sampai tab/peramban ditutup (persistence SESSION) dan cache offline Firestore dimatikan. */
+   - '0': sesi hanya sampai tab/peramban ditutup (persistence SESSION) dan cache offline Firestore dimatikan.
+
+   HEMAT KUOTA (READS/WRITES/DELETES) – ringkasan:
+   - Semua akses Firestore lewat A.db / A.profile di berkas ini (tidak ada akses langsung di tempat lain).
+   - Cache koleksi di memori + sessionStorage, berlaku TTL menit (lihat TTL). Penulisan memperbarui cache di tempat,
+     tidak lagi membuang cache, sehingga tidak ada baca-ulang setelah Tambah/Edit/Hapus.
+   - Query berfilter (mis. {kelas:'VII A'}) disaring dari cache koleksi bila sudah ada (0 read).
+   - update() dilewati bila data tidak berubah; batch() menggabungkan tambah/ubah/hapus dalam satu commit.
+   - Tidak ada onSnapshot (tidak perlu real-time) sehingga tidak ada listener ganda.
+   - Muat ulang paksa dari server: A.db.segarkan([koleksi]) atau list(c, where, semua, true). */
 (function(){
   const A = window.ADM;
   if (!A) { console.error('app.js belum dimuat. Muat assets/app.js sebelum firebase-config.js.'); return; }
@@ -139,7 +148,7 @@
       if (!FB) throw new Error('Reset kata sandi tersedia setelah Firebase dihubungkan.');
       try { await (await init()).auth.sendPasswordResetEmail(email.trim()); } catch(er) { throw pesan(er); }
     },
-    async logout(){ if (!FB) return sesiHapus(); await (await init()).auth.signOut(); }
+    async logout(){ A.db && A.db.reset(); if (!FB) return sesiHapus(); await (await init()).auth.signOut(); }
   };
 
   /* Dipanggil di setiap halaman: pastikan sudah masuk (sesi tersimpan dipulihkan otomatis), lalu muat profil akun. */
@@ -150,11 +159,27 @@
     await A.profile.load(); return true;
   };
 
-  /* ===== profil akun (nama, mapel, kelas diampu, foto) ===== */
+  /* ===== profil akun (nama, mapel, kelas diampu, foto) =====
+     Dokumen users/{uid} dibaca sekali lalu disimpan (memori + sessionStorage, TTL). load() berikutnya (mis. ganti mapel,
+     setelah save, pindah halaman) memakai salinan itu: 0 read. save() hanya menulis bila ada field yang berubah. */
+  const TTL = 20 * 60 * 1000;                              // umur cache sebelum dibaca ulang dari server
+  const sjson = (a, b) => { try { return JSON.stringify(a) === JSON.stringify(b); } catch(_) { return false; } };
+  let profMem = null;
+  const profKey = () => 'adm_p_' + A.uid;
+  const profSes = () => { try { const o = JSON.parse(sessionStorage.getItem(profKey())); return o && o.d && Date.now() - o.t < TTL && o.t <= Date.now() + 1000 ? o : null; } catch(_) { return null; } };
+  const profTulis = () => { try { if (profMem) sessionStorage.setItem(profKey(), JSON.stringify({t:profMem.t, d:profMem.d})); } catch(_) {} };
+  const profAmbil = async () => {
+    if (profMem && profMem.uid === A.uid && Date.now() - profMem.t < TTL) return profMem.d;
+    const o = profSes();
+    if (o) { profMem = {uid:A.uid, t:o.t, d:o.d}; return o.d; }
+    const d = await (await init()).db.collection('users').doc(A.uid).get();
+    profMem = {uid:A.uid, t:Date.now(), d:d.exists ? d.data() : {}}; profTulis();
+    return profMem.d;
+  };
   A.profile = {
-    async load(){
+    async load(force){
       let p;
-      if (FB) { const d = await (await init()).db.collection('users').doc(A.uid).get(); p = d.exists ? d.data() : {}; }
+      if (FB) { if (force) { profMem = null; try { sessionStorage.removeItem(profKey()); } catch(_) {} } p = await profAmbil(); }
       else p = lget('adm_' + A.uid + '_akun', {});
       const {kelas = [], mapelList, ...r} = p, g = A.guru; Object.assign(g, r);
       const ml = Array.isArray(mapelList) && mapelList.length ? mapelList : String(r.mapel || '').split(',').map(x => x.trim()).filter(Boolean).map(n => ({nama:n, kelas:[]}));
@@ -171,51 +196,133 @@
       if (d.mapel && !d.mapelList) ml = String(d.mapel).split(',').map(x => x.trim()).filter(Boolean).map(n => ({nama:n, kelas:[]}));
       ml = ml.map(m => ({nama:m.nama, kelas:[...new Set((m.kelas || []).map(A.kelasNorm))]}));
       const o = {nama:A.namaNorm(d.nama ?? g.nama), nip:d.nip ?? g.nip, hp:d.hp ?? g.hp, foto:d.foto ?? g.foto, mapelList:ml, mapel:ml.map(m => m.nama).join(', '), kelas:[...new Set((d.kelas ?? g.semuaKelas).map(A.kelasNorm))].sort(A.kelasSort), email:A.email};
-      if (FB) await (await init()).db.collection('users').doc(A.uid).set(o, {merge:true}); else lset('adm_' + A.uid + '_akun', o);
+      if (FB) {
+        const lama = await profAmbil();
+        if (!Object.keys(o).every(k => sjson(lama[k], o[k]))) {                 // tulis hanya bila ada field yang berubah
+          await (await init()).db.collection('users').doc(A.uid).set(o, {merge:true});
+          profMem = {uid:A.uid, t:profMem ? profMem.t : Date.now(), d:{...lama, ...o}}; profTulis();
+        }
+      } else lset('adm_' + A.uid + '_akun', o);
       await this.load();
     }
   };
 
-  /* ===== data: setiap akun hanya membaca/menulis  users/{uid}/{koleksi} ===== */
+  /* ===== data: setiap akun hanya membaca/menulis  users/{uid}/{koleksi} =====
+     CACHE: satu entri per koleksi penuh (kunci = nama koleksi) + entri untuk query berfilter yang dijalankan ke server
+     hanya bila koleksi penuhnya belum ada. Entri disimpan di memori (dan sessionStorage untuk koleksi penuh) dengan TTL.
+     Penulisan memperbarui entri di tempat (tanpa baca ulang). */
   const col = async c => (await init()).db.collection('users').doc(A.uid).collection(c), lk = c => 'adm_' + A.uid + '_' + c;
   const MS = new Set(['presensi','nilai','jurnal','tujuan','materi','evaluasi','remedial','pengayaan','mapel']);   // data per mata pelajaran
-  const cache = new Map(), bust = c => cache.delete(c);   // cache koleksi penuh selama halaman terbuka
-  const raw = async (c, where) => {
-    if (!FB) return lget(lk(c), []);
+  const cache = new Map();                                   // kunci → {c, w, t, p, rows}
+  const kk = (c, w) => w.length ? c + '|' + JSON.stringify([...w].sort((a, b) => a[0] < b[0] ? -1 : 1)) : c;
+  const cocok = (d, w) => w.every(([k, v]) => d[k] === v);
+  const masih = e => e && Date.now() - e.t < TTL ? e : null;
+  const sesKey = c => 'adm_c_' + A.uid + '_' + c;
+  const sesBaca = c => { try { const o = JSON.parse(sessionStorage.getItem(sesKey(c))); return o && Array.isArray(o.rows) && Date.now() - o.t < TTL && o.t <= Date.now() + 1000 ? o : null; } catch(_) { return null; } };
+  const tmr = {};
+  const sesTulis = e => {                                    // simpan koleksi penuh ke sessionStorage (ditunda & digabung)
+    if (e.w.length) return; clearTimeout(tmr[e.c]);
+    tmr[e.c] = setTimeout(() => { try { if (cache.get(e.c) !== e || !e.rows) return; const s = JSON.stringify({t:e.t, rows:e.rows}); if (s.length < 2e6) sessionStorage.setItem(sesKey(e.c), s); else sessionStorage.removeItem(sesKey(e.c)); } catch(_) { try { sessionStorage.removeItem(sesKey(e.c)); } catch(_) {} } }, 400);
+  };
+  const hapusC = c => { for (const [k, e] of cache) if (e.c === c) cache.delete(k); try { sessionStorage.removeItem(sesKey(c)); } catch(_) {} };
+  const raw = async (c, w) => {
     let q = await col(c);
-    for (const [k,v] of Object.entries(where)) q = q.where(k, '==', v);   // filter dikerjakan server
+    for (const [k, v] of w) q = q.where(k, '==', v);            // filter dikerjakan server
     return (await q.get()).docs.map(d => ({id:d.id, ...d.data()}));
   };
+  const baru = (c, w) => {
+    const e = {c, w, t:Date.now()}, key = kk(c, w);
+    e.p = raw(c, w).then(r => { e.rows = r; sesTulis(e); return r; });
+    e.p.catch(() => { if (cache.get(key) === e) cache.delete(key); });   // gagal → jangan simpan, coba lagi nanti
+    cache.set(key, e); return e;
+  };
+  const saring = (r, w) => w.length ? r.filter(d => cocok(d, w)) : r;
+  const ambil = (c, w, segar) => {
+    if (segar) hapusC(c);
+    let f = masih(cache.get(c));
+    if (!f) {
+      cache.delete(c);
+      const o = sesBaca(c);
+      if (o) { f = {c, w:[], t:o.t, rows:o.rows, p:Promise.resolve(o.rows)}; cache.set(c, f); }
+    }
+    if (f) return f.p.then(r => saring(r, w));                 // koleksi penuh sudah ada → saring lokal, 0 read
+    if (!w.length) { for (const [k, e] of cache) if (e.c === c) cache.delete(k); return baru(c, []).p; }
+    const key = kk(c, w); let e = masih(cache.get(key));
+    if (!e) { cache.delete(key); e = baru(c, w); }
+    return e.p;
+  };
+  /* terapkan perubahan ke semua entri cache koleksi c (berurutan lewat rantai promise, sehingga aman walau muatan masih berjalan) */
+  const mut = (c, fn) => { for (const e of cache.values()) if (e.c === c) { e.p = e.p.then(r => { const n = fn(r, e); e.rows = n; sesTulis(e); return n; }); e.p.catch(() => {}); } };
+  const cAdd = (c, docs) => mut(c, (r, e) => { docs.forEach(d => { if (cocok(d, e.w) && !r.some(x => x.id === d.id)) r.push(d); }); return r; });
+  const cDel = (c, ids) => { const s = new Set(ids); mut(c, r => r.filter(d => !s.has(d.id))); };
+  const cUbah = (c, id, data) => {
+    for (const [k, e] of cache) if (e.c === c && e.w.some(([f, v]) => f in data && data[f] !== v)) cache.delete(k);   // dokumen pindah keluar/masuk filter → muat ulang bila perlu
+    mut(c, r => { const d = r.find(x => x.id === id); if (d) Object.assign(d, data); return r; });
+  };
+  const cari = (c, id) => { for (const e of cache.values()) if (e.c === c && e.rows) { const d = e.rows.find(x => x.id === id); if (d) return d; } return null; };
+  const tdkBerubah = (c, id, data) => { const d = cari(c, id); return !!d && Object.keys(data).every(k => k in d && sjson(d[k], data[k])); };
   const withMapel = (c, d) => MS.has(c) && A.mapelAktif && d.mapel == null ? {...d, mapel:A.mapelAktif} : d;
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  const KOLEKSI = ['siswa','kelas','mapel','pengaturan','presensi','nilai','jurnal','tujuan','materi','evaluasi','pelanggaran','sikap','remedial','pengayaan','pesan','jadwal','kalender','wkprofil','wksiswa','wkrchk','kolomnilai'];
+
   A.db = {
     mode: A.auth.mode,
-    async list(c, where = {}, semua){
-      const w = Object.entries(where); let p;
-      if (w.length) p = raw(c, where);
-      else { p = cache.get(c); if (!p) { cache.set(c, p = raw(c, {})); p.catch(() => cache.delete(c)); } }
-      let rows = await p;
+    /* list(koleksi, {field:nilai}, semuaMapel, segar) – segar=true: abaikan cache & baca ulang dari server */
+    async list(c, where = {}, semua, segar){
+      const w = Object.entries(where); let rows;
+      if (!FB) rows = lget(lk(c), []);
+      else rows = await ambil(c, w, segar);
       if (!semua && MS.has(c) && A.mapelAktif) rows = rows.filter(d => !d.mapel || d.mapel === A.mapelAktif);   // data tiap mapel terpisah
-      return rows.filter(d => w.every(([k,v]) => d[k] === v));
+      return rows.filter(d => cocok(d, w));
     },
     async add(c, data){
-      data = withMapel(c, data); bust(c);
-      if (FB) { const r = await (await col(c)).add(data); return {id:r.id, ...data}; }
-      const a = lget(lk(c), []), d = {id:Date.now().toString(36) + Math.random().toString(36).slice(2,6), ...data}; a.push(d); lset(lk(c), a); return d;
+      data = withMapel(c, data);
+      if (FB) { const r = await (await col(c)).add(data), d = {id:r.id, ...data}; cAdd(c, [d]); return d; }
+      const a = lget(lk(c), []), d = {id:newId(), ...data}; a.push(d); lset(lk(c), a); return d;
     },
-    async update(c, id, data){ bust(c); if (FB) return (await col(c)).doc(id).update(data); lset(lk(c), lget(lk(c), []).map(d => d.id === id ? {...d, ...data} : d)); },
-    async remove(c, id){ bust(c); if (FB) return (await col(c)).doc(id).delete(); lset(lk(c), lget(lk(c), []).filter(d => d.id !== id)); },
-    async addMany(c, arr){
-      arr = arr.map(d => withMapel(c, d)); bust(c);
-      if (!FB) { const a = lget(lk(c), []); arr.forEach(d => a.push({id:Date.now().toString(36) + Math.random().toString(36).slice(2,6), ...d})); lset(lk(c), a); return; }
-      const f = await init(), ref = await col(c);
-      for (let i = 0; i < arr.length; i += 400) { const b = f.db.batch(); arr.slice(i, i + 400).forEach(d => b.set(ref.doc(), d)); await b.commit(); }
+    async update(c, id, data){
+      if (FB) {
+        if (tdkBerubah(c, id, data)) return;                   // tidak ada yang berubah → tidak ada write
+        await (await col(c)).doc(id).update(data); cUbah(c, id, data); return;
+      }
+      lset(lk(c), lget(lk(c), []).map(d => d.id === id ? {...d, ...data} : d));
     },
-    async removeMany(c, ids){
-      bust(c);
-      if (!FB) { const s = new Set(ids); lset(lk(c), lget(lk(c), []).filter(d => !s.has(d.id))); return; }
-      const f = await init(), ref = await col(c);
-      for (let i = 0; i < ids.length; i += 400) { const b = f.db.batch(); ids.slice(i, i + 400).forEach(id => b.delete(ref.doc(id))); await b.commit(); }
+    async remove(c, id){
+      if (FB) { await (await col(c)).doc(id).delete(); cDel(c, [id]); return; }
+      lset(lk(c), lget(lk(c), []).filter(d => d.id !== id));
     },
-    KOLEKSI: ['siswa','kelas','mapel','pengaturan','presensi','nilai','jurnal','tujuan','materi','evaluasi','pelanggaran','sikap','remedial','pengayaan','pesan','jadwal','kalender','wkprofil','wksiswa','wkrchk','kolomnilai']
+    /* batch(c, {tambah:[doc], ubah:[{id,data}], hapus:[id]}) – satu commit per 400 operasi; ubah yang tidak berubah dilewati */
+    async batch(c, {tambah = [], ubah = [], hapus = []} = {}){
+      tambah = tambah.map(d => withMapel(c, d)); ubah = ubah.map(u => ({id:u.id, data:withMapel(c, u.data)}));
+      if (!FB) {
+        let a = lget(lk(c), []); const h = new Set(hapus), um = new Map(ubah.map(u => [u.id, u.data]));
+        a = a.filter(d => !h.has(d.id)).map(d => um.has(d.id) ? {...d, ...um.get(d.id)} : d);
+        const out = tambah.map(d => ({id:newId(), ...d})); lset(lk(c), a.concat(out)); return out;
+      }
+      ubah = ubah.filter(u => !tdkBerubah(c, u.id, u.data));
+      if (!tambah.length && !ubah.length && !hapus.length) return [];
+      const f = await init(), ref = await col(c), out = [];
+      const ops = [...tambah.map(d => ({t:'a', ref:ref.doc(), d})), ...ubah.map(u => ({t:'u', ref:ref.doc(u.id), id:u.id, d:u.data})), ...hapus.map(id => ({t:'h', ref:ref.doc(id), id}))];
+      for (let i = 0; i < ops.length; i += 400) {
+        const s = ops.slice(i, i + 400), b = f.db.batch();
+        s.forEach(o => o.t === 'a' ? b.set(o.ref, o.d) : o.t === 'u' ? b.update(o.ref, o.d) : b.delete(o.ref));
+        await b.commit();                                      // cache diperbarui per chunk yang sudah berhasil
+        const add = s.filter(o => o.t === 'a').map(o => ({id:o.ref.id, ...o.d}));
+        if (add.length) { cAdd(c, add); out.push(...add); }
+        s.filter(o => o.t === 'u').forEach(o => cUbah(c, o.id, o.d));
+        const del = s.filter(o => o.t === 'h').map(o => o.id); if (del.length) cDel(c, del);
+      }
+      return out;
+    },
+    async addMany(c, arr){ await this.batch(c, {tambah:arr}); },
+    async removeMany(c, ids){ await this.batch(c, {hapus:ids}); },
+    /* buang cache (semua koleksi, atau yang disebut) → pembacaan berikutnya mengambil dari server */
+    segarkan(cs){ (cs ? [].concat(cs) : [...new Set([...cache.values()].map(e => e.c))]).forEach(hapusC); if (!cs) { profMem = null; try { sessionStorage.removeItem(profKey()); } catch(_) {} } },
+    /* bersihkan semua cache (dipanggil saat keluar akun) */
+    reset(){
+      cache.clear(); profMem = null;
+      try { Object.keys(sessionStorage).filter(k => k.startsWith('adm_c_') || k.startsWith('adm_p_')).forEach(k => sessionStorage.removeItem(k)); } catch(_) {}
+    },
+    KOLEKSI
   };
 })();

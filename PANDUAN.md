@@ -45,3 +45,12 @@ Pengaturan › Profil Guru → tempel tautan Google Drive (akses "Siapa saja yan
 3. Buat file HTML di `pages/…` (salin dari halaman lain, ganti kunci dan `<title>`) dengan `<script>ADM.page('kunci');</script>`.
 4. Teks bantuannya di `bagian/M-TEKS-BANTUAN.js`; bila datanya per mapel, tambahkan kuncinya ke `PMK` di `N-PETA-HALAMAN.js`.
 5. Koleksi data baru: tambahkan ke `KOLEKSI` di `firebase-config.js` (agar ikut cadangan) dan ke `MS` bila datanya terpisah per mapel.
+
+## Hemat kuota Firestore (READS / WRITES / DELETES)
+Semua akses Firestore ada di `assets/firebase-config.js` (`ADM.db`, `ADM.profile`); tidak ada `onSnapshot`.
+- **Cache**: koleksi dibaca sekali lalu disimpan di memori + sessionStorage (TTL 20 menit, konstanta `TTL`). Pindah halaman/tab, ganti mapel, dan muat ulang halaman tidak membaca ulang selama cache berlaku.
+- **Query berfilter** (mis. `{kelas:'VII A'}`) disaring dari cache koleksi penuh bila ada (0 read); bila belum ada, hanya dokumen yang cocok yang dibaca dari server dan di-cache.
+- **Tulis**: `add/update/remove/batch` memperbarui cache di tempat (tanpa baca ulang). `update()` dilewati bila isi tidak berubah. Presensi disimpan dengan diff (ubah yang berubah, tambah yang baru, hapus yang tidak ada), bukan hapus-lalu-buat-ulang.
+- **Profil guru** (`users/{uid}`) di-cache; `profile.save()` hanya menulis bila ada field yang berubah.
+- **Paksa baca ulang dari server**: `ADM.db.segarkan()` (semua) / `ADM.db.segarkan('nilai')` / `ADM.db.list(koleksi, {}, 1, true)`. Cadangan dan "Hapus semua" selalu membaca dari server. Cache dibersihkan saat keluar akun.
+- Koleksi baru: cukup pakai `S.db.list/add/update/remove/batch`; jangan memanggil Firestore langsung.

@@ -84,8 +84,12 @@ async function presInput(v){const q=new URLSearchParams(location.search);
       const sisa=sis.filter(s=>!st[s.id]).length;
       if(sisa){if(man)ps('Masih sisa '+sisa+' siswa. Isian tersimpan sebagai draf di perangkat ini; bisa dilanjutkan kapan saja, tanpa kuota/jaringan.');return}
       busy=true;ps('Menyimpan ke server… (bila jaringan lambat, mohon tunggu; isian tetap aman)');
-      try{if(ex.length){await S.db.removeMany('presensi',ex.map(x=>x.id));ex=[]}
-        await S.db.addMany('presensi',sis.map(s=>({tanggal:t,kelas:k,jam,pertemuan:+$('pt').value,siswaId:s.id,nama:s.nama,status:st[s.id]})));
+      try{/* diff terhadap data yang sudah ada: perbarui yang berubah, tambah siswa baru, hapus yang sudah tidak ada (bukan hapus-lalu-buat-ulang semua) */
+        const bar=sis.map(s=>({tanggal:t,kelas:k,jam,pertemuan:+$('pt').value,siswaId:s.id,nama:s.nama,status:st[s.id]})),
+          lama=new Map(),dup=[],tambah=[],ubah=[];
+        ex.forEach(x=>lama.has(x.siswaId)?dup.push(x.id):lama.set(x.siswaId,x));
+        bar.forEach(d=>{const x=lama.get(d.siswaId);if(x){lama.delete(d.siswaId);ubah.push({id:x.id,data:d})}else tambah.push(d)});
+        await S.db.batch('presensi',{tambah,ubah,hapus:[...dup,...[...lama.values()].map(x=>x.id)]});ex=[];
         hapusD(key);m.close();S.toast('Presensi tersimpan');await loadJ();kartu()}
       catch(er){busy=false;tulisD(key,st,+$('pt').value);ps('Belum tersimpan ke server (jaringan lambat/terputus). Isian AMAN di perangkat ini. Klik “Simpan” untuk mencoba lagi.',1);S.toast('Gagal menyimpan, isian aman. Coba lagi.',1)}};
     const lanjut=()=>{tulisD(key,st,+$('pt').value);draw();simpan()};
